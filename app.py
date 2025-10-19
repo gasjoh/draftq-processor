@@ -3,6 +3,32 @@ import time
 import boto3
 import pandas as pd
 from flask import Flask, request, jsonify
+from botocore.exceptions import ClientError   # add this line if missing
+
+# ✅ Add the wait_for_s3_file function right here (below imports)
+def wait_for_s3_file(bucket, key, timeout=60):
+    """
+    Wait until the uploaded file appears in S3.
+    Retries every 3 seconds until timeout (default 60 s).
+    """
+    s3 = boto3.client("s3")
+    start = time.time()
+    while True:
+        try:
+            s3.head_object(Bucket=bucket, Key=key)
+            print(f"✅ File found in S3: {key}")
+            return True
+        except ClientError as e:
+            if e.response['Error']['Code'] == "404":
+                if time.time() - start > timeout:
+                    raise TimeoutError(f"⏱️ File not found in S3 after {timeout} seconds.")
+                print("File not yet in S3 — retrying in 3 s...")
+                time.sleep(3)
+            else:
+                raise
+
+# Continue with the rest of your app setup
+app = Flask(__name__)
 
 app = Flask(__name__)
 
@@ -80,3 +106,15 @@ def home():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
+@app.route("/process", methods=["POST"])
+def process_file():
+    data = request.get_json()
+    file_key = data.get("file_key")
+    bucket_name = os.environ.get("S3_BUCKET_NAME")
+
+    # Wait until the file is ready in S3
+    wait_for_s3_file(bucket_name, file_key)
+
+    # Example: confirm it exists
+    return jsonify({"message": f"✅ File {file_key} found and ready for processing."})
