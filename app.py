@@ -108,7 +108,7 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
 
 @app.route("/process", methods=["POST"])
-def process_file():
+def process_file_wait():
     data = request.get_json()
     file_key = data.get("file_key")
     bucket_name = os.environ.get("S3_BUCKET_NAME")
